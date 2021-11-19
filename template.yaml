@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  lambda-cloudwatch-maintenance-alarms
+  
+Globals:
+  Function:
+    Timeout: 2
+
+Parameters:
+  alarmNames:
+    Type: String
+    Description: Which alarm(s) will be affected?
+    NoEcho: false
+
+Resources:
+  LambdaDisableMaintenanceFunction:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: disableAlarmActions/
+      Handler: app.lambdaHandler
+      Runtime: nodejs14.x
+      Architectures:
+        - x86_64
+      Environment:
+        Variables:
+          ALARM_NAMES_ARRAY: !Ref alarmNames  
+      Policies:
+      - Statement:
+        - Sid: CloudWatchDisableAlarmActions
+          Effect: Allow
+          Action:
+          - cloudwatch:DisableAlarmActions
+          Resource: '*'  
+      Events:
+        MaintenanceSchedule:
+          Type: Schedule 
+          Properties:
+            # https://docs.aws.amazon.com/lambda/latest/dg/services-cloudwatchevents-expressions.html
+            Schedule: 'cron(10 01 * * ? *)'
+            Name: ServiceMaintenanceSchedule-Disable
+            Description: The is the schedule to disable alerts
+            Enabled: True
+  LambdaEnableMaintenanceFunction:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: enableAlarmActions/
+      Handler: app.lambdaHandler
+      Runtime: nodejs14.x
+      Architectures:
+        - x86_64
+      Environment:
+        Variables:
+          ALARM_NAMES_ARRAY: !Ref alarmNames        
+      Policies:
+      - Statement:
+        - Sid: CloudWatchEnableAlarmActions
+          Effect: Allow
+          Action:
+          - cloudwatch:EnableAlarmActions
+          Resource: '*'  
+      Events:
+        MaintenanceSchedule:
+          Type: Schedule 
+          Properties:
+            # https://docs.aws.amazon.com/lambda/latest/dg/services-cloudwatchevents-expressions.html
+            Schedule: 'cron(15 01 * * ? *)'
+            Name: ServiceMaintenanceSchedule-Enable
+            Description: This is the schedule to enable alerts
+            Enabled: True          
+
+# Outputs:
+#   LambdaMaintenanceFunction:
+#     Description: "Lambda Maintenance Function ARN"
+#     Value: !GetAtt LambdaMaintenanceFunction.Arn
+#   LambdaMaintenanceFunctionIamRole:
+#     Description: "Implicit IAM Role created for Lambda Maintenance function"
+#     Value: !GetAtt LambdaMaintenanceFunctionRole.Arn
